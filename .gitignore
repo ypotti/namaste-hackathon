@@ -4,3 +4,6 @@ __pycache__/
 *.py[cod]
 *.sqlite
 generated/*.html
+*.sqlite-shm
+*.sqlite-wal
+*.png
