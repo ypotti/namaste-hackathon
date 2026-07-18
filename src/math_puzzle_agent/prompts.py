@@ -60,30 +60,30 @@ A ready spec must define every field below. Be precise — the Generator will im
 spec literally.
 
 **Spec fields:**
-- title: A creative, descriptive title (e.g. "The Rooftop Drop Challenge").
-- math_concept: The core principle (e.g. "Free Fall", "Projectile Motion", "Torque").
+- title: A creative, descriptive title (e.g. "The Rooftop Drop Challenge", "Sarah's Fruit Stand").
+- math_concept: The core principle (e.g. "Equal sharing", "Fractions", "Free Fall", "Torque").
 - scene_description: A vivid real-world scenario. Describe what the user will SEE: the
-  background environment, the key objects and their approximate positions (left side, center,
-  right side of the canvas), and what the animated element does. Keep it compatible with a
-  canvas where the ground sits near the bottom and the sky fills the top.
+  background environment (keep it extremely clean and simple, avoiding heavy background elements
+  like complex forests, detailed cityscapes, mountains, or clouds to maintain visual focus on the math elements),
+  the key objects and their approximate positions (left side, center, right side of the canvas), and what the
+  animated element does. Keep it compatible with a canvas where the ground sits near the bottom
+  and the sky fills the top.
 - question: A clear, single-sentence educational question the user must answer numerically.
 - known_values: All numeric parameters the user needs, each with a name, value, and unit.
-  Include gravity (g = 9.8 m/s²) explicitly when relevant.
-- learner_answer_label: The exact label text for the answer input field (e.g. "Fall time (s)").
+  Include physical constants (like gravity g = 9.8 m/s²) ONLY when relevant to the puzzle.
+- learner_answer_label: The exact label text for the answer input field (e.g. "Fall time (s)", "Apples left").
 - correct_answer: The mathematically correct numeric answer (float).
 - accepted_tolerance: How close the user's answer must be to count as correct. Default: {cfg.default_tolerance}.
 - answer_unit: The unit of the correct answer (e.g. "s", "m", "°").
-- formulas: The equations needed (e.g. ["h = ½ g t²", "t = √(2h/g)"]).
+- formulas: The equations/rules needed (e.g. ["Total = Baskets × Apples per Basket", "h = ½ g t²"]).
 - solution_steps: Step-by-step numbered calculations leading to correct_answer. Each step
   is a string. Minimum 3 steps.
 - hint: A helpful nudge that guides without revealing the answer.
 - animation_description: Describe the animation in terms of the fixed canvas layout:
   - The canvas is {cfg.canvas_width}x{cfg.canvas_height}px.
   - Ground line is at y≈{cfg.canvas_height - 60}px. Sky fills above it; earth strip below.
-  - Describe where each scene object sits (e.g. "a tall building on the left, base on the
-    ground line, height representing {{}}_m scaled to canvas pixels").
-  - Describe the animated element's start position and path (e.g. "ball starts at the top
-    of the building and falls vertically downward to the ground").
+  - Describe where each scene object sits (e.g. "six baskets arranged across the center on the ground line" or "a tall building on the left").
+  - Describe the animated element's start position and path (e.g. "apples move from the table into the baskets" or "ball falls vertically downward to the ground").
   - Describe when the simulation ends and what the success/failure state looks like.
 
 Ensure all calculations in the spec are internally consistent. The correct_answer must be
@@ -186,6 +186,7 @@ Follow this layout for every puzzle without exception:
   - All scene objects (buildings, platforms, cannons, targets) have their BASE at y = {ground_y}.
   - Heights are scaled: a real-world height H metres maps to (H / max_scene_height) * {ground_y} pixels upward from y = {ground_y}.
   - The animated element starts at its logical origin in this coordinate space.
+  - Keep the scene graphics clean and simple. Draw only the core scene objects, indicator arrows, and labels. Do NOT draw heavy background elements (such as clouds, mountains, detailed cityscapes, or complex forests) to maintain visual clarity and focus on the math puzzle.
 
 ━━━ SCRIPT ARCHITECTURE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Structure the <script> block exactly as follows:
@@ -193,7 +194,7 @@ Structure the <script> block exactly as follows:
 // ── 1. Constants from spec (hardcode the values from the JSON) ──────────────
 const CORRECT_ANSWER = [spec.correct_answer];   // numeric literal
 const TOLERANCE      = [spec.accepted_tolerance]; // numeric literal
-const G              = 9.8;  // or whatever gravity value the spec uses
+// Hardcode all other constants from spec.known_values here (e.g. const INITIAL_APPLES = 48; or const G = 9.8; if relevant)
 
 // ── 2. State ────────────────────────────────────────────────────────────────
 let animating = false;

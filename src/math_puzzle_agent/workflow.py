@@ -49,6 +49,20 @@ def route_after_planning(state: PuzzleState) -> Literal["generator", "ask_user"]
     return "generator" if state["decision"].status == "ready" else "ask_user"
 
 
+def route_after_review(state: PuzzleState, max_attempts: int = 3) -> Literal["generator", "write_file_and_finish"]:
+    decision: ReviewerDecision | None = state.get("reviewer_decision")
+    attempts = state.get("generation_attempts", 0)
+
+    if decision and decision.approved:
+        return "write_file_and_finish"
+
+    if attempts >= max_attempts:
+        log.warning("Max review attempts (%d) reached — accepting current output", max_attempts)
+        return "write_file_and_finish"
+
+    return "generator"
+
+
 def build_graph(cfg: WorkflowConfig, checkpointer=None):
     """Build the workflow. Pass a LangGraph checkpointer for multi-turn memory."""
     planner_llm = get_llm(cfg.planner_model, cfg.planner_temperature)
@@ -65,18 +79,8 @@ def build_graph(cfg: WorkflowConfig, checkpointer=None):
     reviewer = reviewer_llm.with_structured_output(ReviewerDecision)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    def route_after_review(state: PuzzleState) -> Literal["generator", "write_file_and_finish"]:
-        decision: ReviewerDecision | None = state.get("reviewer_decision")
-        attempts = state.get("generation_attempts", 0)
-
-        if decision and decision.approved:
-            return "write_file_and_finish"
-
-        if attempts > cfg.max_review_attempts:
-            log.warning("Max review attempts (%d) reached — accepting current output", cfg.max_review_attempts)
-            return "write_file_and_finish"
-
-        return "generator"
+    def route_after_review_local(state: PuzzleState) -> Literal["generator", "write_file_and_finish"]:
+        return route_after_review(state, max_attempts=cfg.max_review_attempts)
 
     def plan(state: PuzzleState):
         log.info("Planner  ▶  parsing intent...")
@@ -245,7 +249,7 @@ def build_graph(cfg: WorkflowConfig, checkpointer=None):
     graph.add_edge(START, "planner")
     graph.add_conditional_edges("planner", route_after_planning)
     graph.add_edge("generator", "reviewer")
-    graph.add_conditional_edges("reviewer", route_after_review)
+    graph.add_conditional_edges("reviewer", route_after_review_local)
     graph.add_edge("ask_user", END)
     graph.add_edge("write_file_and_finish", END)
 
