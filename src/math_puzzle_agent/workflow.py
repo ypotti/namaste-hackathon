@@ -12,6 +12,7 @@ from langgraph.graph.message import add_messages
 from .browser import capture_screenshot, png_to_data_url
 from .config import WorkflowConfig
 from .prompts import get_generator_prompt, get_planner_prompt, get_reviewer_prompt, get_visual_review_prompt
+from .router import SemanticRouter
 from .schemas import PlannerDecision, PuzzleSpec, ReviewerDecision
 
 log = logging.getLogger(__name__)
@@ -24,6 +25,8 @@ class PuzzleState(TypedDict, total=False):
     generated_html: str
     output_path: str
     generation_attempts: int
+    guardrail_flagged: bool
+    guardrail_rejection_reason: str
 
 
 def strip_code_fence(text: str) -> str:
@@ -87,6 +90,45 @@ def build_graph(
     planner = planner_llm.with_structured_output(PlannerDecision)
     reviewer = reviewer_llm.with_structured_output(ReviewerDecision)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    router = SemanticRouter(cfg)
+
+    def route_after_guardrail(state: PuzzleState) -> Literal["planner", "reject_input"]:
+        if state.get("guardrail_flagged"):
+            return "reject_input"
+        return "planner"
+
+    def guardrail_node(state: PuzzleState):
+        if not cfg.guardrail_enabled:
+            return {"guardrail_flagged": False}
+
+        log.info("Guardrail  ▶  inspecting input...")
+        # Get the latest human message
+        user_msgs = [m for m in state.get("messages", []) if isinstance(m, HumanMessage)]
+        if not user_msgs:
+            return {"guardrail_flagged": False}
+
+        latest_query = user_msgs[-1].content
+        try:
+            route_name, score = router.route(latest_query)
+            if route_name:
+                log.warning("Guardrail  ✗  flagged as '%s' (score=%.4f)", route_name, score)
+                return {
+                    "guardrail_flagged": True,
+                    "guardrail_rejection_reason": route_name
+                }
+        except Exception as e:
+            log.error("Guardrail error: %s", e)
+            raise e
+
+        log.info("Guardrail  ✔  input clean")
+        return {"guardrail_flagged": False}
+
+    def reject_input(state: PuzzleState):
+        unified_message = "I am unable to answer these questions as they are not relevant to our model and design."
+        return {
+            "messages": [AIMessage(content=unified_message)]
+        }
 
     def route_after_review_local(state: PuzzleState) -> Literal["generator", "write_file_and_finish"]:
         return route_after_review(state, max_attempts=cfg.max_review_attempts)
@@ -249,17 +291,21 @@ def build_graph(
         }
 
     graph = StateGraph(PuzzleState)
+    graph.add_node("guardrail", guardrail_node)
+    graph.add_node("reject_input", reject_input)
     graph.add_node("planner", plan)
     graph.add_node("ask_user", ask_user)
     graph.add_node("generator", generate)
     graph.add_node("reviewer", review)
     graph.add_node("write_file_and_finish", write_file_and_finish)
 
-    graph.add_edge(START, "planner")
+    graph.add_edge(START, "guardrail")
+    graph.add_conditional_edges("guardrail", route_after_guardrail)
     graph.add_conditional_edges("planner", route_after_planning)
     graph.add_edge("generator", "reviewer")
     graph.add_conditional_edges("reviewer", route_after_review_local)
     graph.add_edge("ask_user", END)
+    graph.add_edge("reject_input", END)
     graph.add_edge("write_file_and_finish", END)
 
     return graph.compile(checkpointer=checkpointer)
