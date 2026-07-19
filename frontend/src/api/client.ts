@@ -1,7 +1,7 @@
 import type { GameSpecV1 } from "../types/game";
 
 const API_ROOT = "/api/v1";
-export const CONVERSATION_STORAGE_KEY = "physicsforge.conversation_id";
+export const CONVERSATION_PARAM_KEY = "conversation_id";
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) { super(message); this.name = "ApiError"; }
@@ -78,20 +78,39 @@ export function runEventsUrl(runId: string) {
   return `${API_ROOT}/runs/${encodeURIComponent(runId)}/events`;
 }
 
-type ConversationStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+function getUrlParam(name: string): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  return params.get(name);
+}
 
-export async function getOrCreateConversationId(storage: ConversationStorage = localStorage) {
-  const stored = storage.getItem(CONVERSATION_STORAGE_KEY);
+function setUrlParam(name: string, value: string | null) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (value) {
+    url.searchParams.set(name, value);
+  } else {
+    url.searchParams.delete(name);
+  }
+  window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+}
+
+export async function getOrCreateConversationId() {
+  const stored = getUrlParam(CONVERSATION_PARAM_KEY);
   if (stored) {
-    try { await getConversation(stored); return stored; }
-    catch (error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; storage.removeItem(CONVERSATION_STORAGE_KEY); }
+    try {
+      await getConversation(stored);
+      return stored;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 404) throw error;
+      setUrlParam(CONVERSATION_PARAM_KEY, null);
+    }
   }
   const conversation = await createConversation();
-  storage.setItem(CONVERSATION_STORAGE_KEY, conversation.id);
+  setUrlParam(CONVERSATION_PARAM_KEY, conversation.id);
   return conversation.id;
 }
 
-
-export function forgetConversation(storage: Pick<Storage, "removeItem"> = localStorage) {
-  storage.removeItem(CONVERSATION_STORAGE_KEY);
+export function forgetConversation() {
+  setUrlParam(CONVERSATION_PARAM_KEY, null);
 }
