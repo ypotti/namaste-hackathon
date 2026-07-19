@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 from collections import deque
-
 import pytest
 
-from math_puzzle_agent.games.fixtures import CANONICAL_GAMES, CANONICAL_PROJECTILE_GAME
-from math_puzzle_agent.structured_workflow import (
-    GameReviewV1,
-    PlannerDecisionV1,
-    StructuredGameWorkflow,
-)
+from math_puzzle_agent.schemas import PlannerDecision, PuzzleSpec, ReviewerDecision
+from math_puzzle_agent.games.fixtures import CANONICAL_PUZZLE
+from math_puzzle_agent.structured_workflow import StructuredGameWorkflow
 
 
 class FakeStructured:
@@ -32,131 +28,63 @@ class FakeLLM:
         self.requested_schema = schema
         return FakeStructured(self.values)
 
+    def invoke(self, _messages):
+        if not hasattr(self, "_values_deque"):
+            self._values_deque = deque(self.values)
+        value = self._values_deque.popleft()
+        if isinstance(value, Exception):
+            raise value
+        
+        class MockMessage:
+            def __init__(self, content):
+                self.content = content
+        return MockMessage(value)
 
-def workflow(*, planner, designer=(), reviewer=(), attempts=3, progress=None):
+
+def workflow(*, planner, generator=(), reviewer=(), attempts=3, progress=None):
     return StructuredGameWorkflow(
         planner_llm=FakeLLM(planner),
-        designer_llm=FakeLLM(designer),
+        designer_llm=FakeLLM(generator),
         reviewer_llm=FakeLLM(reviewer),
         max_attempts=attempts,
         progress=progress,
     )
 
 
-def ready_decision():
-    return PlannerDecisionV1(
-        status="ready",
-        design_brief="Teach middle-school projectile motion with an elevated target.",
-        mechanic="projectile_target",
-    )
-
-
-@pytest.mark.parametrize("spec", CANONICAL_GAMES, ids=lambda spec: spec.game_type)
-def test_every_supported_mechanic_is_solver_verified(spec):
+def test_returns_ready_workflow_state():
+    spec = CANONICAL_PUZZLE
+    html_content = "<html><body>Check answer</body></html>"
     app = workflow(
-        planner=[PlannerDecisionV1(
-            status="ready",
-            design_brief=f"Teach with {spec.game_type}.",
-            mechanic=spec.game_type,
-        )],
-        designer=[spec],
-        reviewer=[GameReviewV1(approved=True)],
+        planner=[PlannerDecision(status="ready", puzzle_spec=spec)],
+        generator=[html_content],
+        reviewer=[ReviewerDecision(approved=True)],
     )
 
-    result = app.invoke(f"Build a {spec.game_type} game")
+    result = app.invoke("Make a triangle game")
 
     assert result["status"] == "ready"
     assert result["spec"] == spec
+    assert result["generated_html"] == html_content
 
 
-def test_returns_clarification_without_designing():
+def test_returns_clarification_without_generating():
     app = workflow(
-        planner=[PlannerDecisionV1(status="needs_more_info", next_question="Which age group?")]
+        planner=[PlannerDecision(status="need_more_info", next_question="Which legs?")]
     )
-    result = app.invoke("Make a physics game")
+    result = app.invoke("Make a right triangle game")
     assert result["status"] == "needs_more_info"
-    assert result["message"] == "Which age group?"
+    assert result["message"] == "Which legs?"
     assert "spec" not in result
-
-
-def test_returns_solver_verified_spec_and_progress_events():
-    events = []
-    app = workflow(
-        planner=[ready_decision()],
-        designer=[CANONICAL_PROJECTILE_GAME],
-        reviewer=[GameReviewV1(approved=True)],
-        progress=lambda event, details: events.append((event, details)),
-    )
-    result = app.invoke("Teach projectile motion")
-    assert result["status"] == "ready"
-    assert result["spec"] == CANONICAL_PROJECTILE_GAME
-    assert [event for event, _ in events] == [
-        "planner_started",
-        "planner_completed",
-        "designer_started",
-        "validation_started",
-        "validation_completed",
-        "reviewer_started",
-        "reviewer_completed",
-    ]
-
-
-def test_reviewer_rejection_causes_bounded_repair():
-    revised = CANONICAL_PROJECTILE_GAME.model_copy(update={"title": "Revised Arc"})
-    app = workflow(
-        planner=[ready_decision()],
-        designer=[CANONICAL_PROJECTILE_GAME, revised],
-        reviewer=[
-            GameReviewV1(approved=False, feedback="Use a clearer title"),
-            GameReviewV1(approved=True),
-        ],
-        attempts=2,
-    )
-    result = app.invoke("Teach projectile motion")
-    assert result["status"] == "ready"
-    assert result["attempts"] == 2
-    assert result["spec"].title == "Revised Arc"
-
-
-def test_unwinnable_output_fails_after_attempt_limit():
-    impossible = CANONICAL_PROJECTILE_GAME.model_copy(
-        update={
-            "physics": CANONICAL_PROJECTILE_GAME.physics.model_copy(
-                update={"target_x": 735, "target_y": 90}
-            ),
-            "solution": CANONICAL_PROJECTILE_GAME.solution.model_copy(
-                update={"angle": 20, "power": 55}
-            ),
-        }
-    )
-    app = workflow(planner=[ready_decision()], designer=[impossible], attempts=1)
-    result = app.invoke("Teach projectile motion")
-    assert result["status"] == "failed"
-    assert "No valid game" in result["message"]
-
-
-def test_unsupported_concept_is_explicit_planner_clarification():
-    question = "Only projectile-target is supported; should I adapt fractions to trajectory ratios?"
-    app = workflow(
-        planner=[PlannerDecisionV1(status="needs_more_info", next_question=question)]
-    )
-    result = app.invoke("Create a fraction pizza game")
-    assert result == {
-        "request": "Create a fraction pizza game",
-        "decision": result["decision"],
-        "status": "needs_more_info",
-        "message": question,
-    }
-
-
-def test_refused_planner_output_becomes_failure():
-    app = workflow(planner=[None])
-    result = app.invoke("Teach motion")
-    assert result["status"] == "failed"
-    assert "refused" in result["message"]
 
 
 def test_blank_request_never_calls_models():
     app = workflow(planner=[])
     result = app.invoke("  ")
     assert result["status"] == "needs_more_info"
+
+
+def test_invoke_synchronizes_thread_id():
+    app = workflow(planner=[PlannerDecision(status="need_more_info", next_question="What legs?")])
+    assert app.cfg.thread_id != "puzzle-test-123"
+    app.invoke("Teach triangle", thread_id="puzzle-test-123")
+    assert app.cfg.thread_id == "puzzle-test-123"

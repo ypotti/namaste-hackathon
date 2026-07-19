@@ -62,7 +62,7 @@ class APIBoundaryMiddleware(BaseHTTPMiddleware):
         if response.headers.get("content-type", "").startswith("text/html"):
             response.headers["X-Frame-Options"] = "SAMEORIGIN"
             response.headers["Content-Security-Policy"] = (
-                "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+                "default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; "
                 "img-src data:; frame-ancestors 'self'"
             )
         else:

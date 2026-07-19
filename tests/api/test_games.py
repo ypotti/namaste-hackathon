@@ -1,8 +1,7 @@
 from fastapi.testclient import TestClient
 
 from math_puzzle_agent.api.app import create_app
-from math_puzzle_agent.games.schemas import parse_game_spec_v1
-from math_puzzle_agent.games.registry import verify_game
+from math_puzzle_agent.schemas import PuzzleSpec
 
 
 class FakeDatabase:
@@ -21,9 +20,9 @@ def test_demo_game_uses_verified_public_contract() -> None:
         response = client.get("/api/v1/games/demo")
 
     assert response.status_code == 200
-    spec = parse_game_spec_v1(response.json())
-    assert spec.game_type == "projectile_target"
-    assert verify_game(spec)
+    spec = PuzzleSpec.model_validate(response.json())
+    assert spec.title == "The 3–4–5 Triangle Challenge"
+    assert spec.math_concept == "Pythagorean theorem"
 
 
 def test_demo_game_html_is_iframe_ready() -> None:
@@ -33,6 +32,8 @@ def test_demo_game_html_is_iframe_ready() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     assert response.headers["x-frame-options"] == "SAMEORIGIN"
+    csp = response.headers["content-security-policy"]
+    assert "https://cdn.jsdelivr.net" in csp
     assert "sandbox" not in response.text.lower()
     assert "<!doctype html>" in response.text.lower()
-    assert "Check answer" in response.text
+    assert "The 3–4–5 Triangle Challenge" in response.text

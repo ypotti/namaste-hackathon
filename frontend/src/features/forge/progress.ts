@@ -13,6 +13,7 @@ export type ProgressAction =
   | { type: "connect" }
   | { type: "event"; event: string; data?: Record<string, unknown> }
   | { type: "failed"; message: string }
+  | { type: "needs_more_info"; message: string }
   | { type: "reset" };
 
 export const initialProgress: ProgressState = { status: "idle", completed: [] };
@@ -25,6 +26,7 @@ export function progressReducer(state: ProgressState, action: ProgressAction): P
   if (action.type === "reset") return initialProgress;
   if (action.type === "connect") return { ...state, status: state.status === "running" ? "running" : "connecting" };
   if (action.type === "failed") return { ...state, status: "failed", message: action.message };
+  if (action.type === "needs_more_info") return { ...state, status: "needs_more_info", message: action.message };
   const event = normalizeRunEvent(action.event);
   if (event === "game.ready") return { ...state, status: "ready", gameId: stringValue(action.data?.game_id) };
   if (event === "planner.needs_more_info") return { ...state, status: "needs_more_info", message: stringValue(action.data?.message) ?? "The planner needs another detail." };

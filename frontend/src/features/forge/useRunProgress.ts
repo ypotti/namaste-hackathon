@@ -35,7 +35,7 @@ export function useRunProgress(runId: string | undefined, { onReady, onFailed, o
     source.onerror = () => { void getRun(runId, controller.signal).then(run => {
       if (!active) return;
       if (run.status === "completed" && run.game_id) { source.close(); void finish(run.game_id); }
-      else if (run.status === "needs_more_info") { source.close(); dispatch({ type: "failed", message: run.message ?? "The planner needs another detail." }); }
+      else if (run.status === "needs_more_info") { source.close(); dispatch({ type: "needs_more_info", message: run.message ?? "What detail should I use?" }); }
       else if (run.status === "failed") { source.close(); dispatch({ type: "failed", message: run.error?.message ?? "Game generation failed." }); }
     }).catch(() => { /* EventSource reconnects automatically. */ }); };
     return () => { active = false; controller.abort(); source.close(); };

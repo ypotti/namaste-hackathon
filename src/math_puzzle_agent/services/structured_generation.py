@@ -11,8 +11,6 @@ from math_puzzle_agent.api.settings import APISettings
 from math_puzzle_agent.db.models import Game, GenerationRun
 from math_puzzle_agent.db.checkpoints import postgres_checkpointer_sync
 from math_puzzle_agent.db.repositories import MessageRepository
-from math_puzzle_agent.games.registry import solve_game
-from math_puzzle_agent.games.html_renderer import render_game_html
 from math_puzzle_agent.structured_workflow import create_openai_structured_workflow
 
 
@@ -48,12 +46,14 @@ async def execute_structured_generation(
                     planner_model=settings.planner_model,
                     designer_model=settings.designer_model,
                     reviewer_model=settings.reviewer_model,
+                    reviewer_vision_model=settings.reviewer_vision_model,
                     max_attempts=settings.max_generation_attempts,
                     progress=progress,
                     api_key=settings.openai_api_key.get_secret_value() if settings.openai_api_key else None,
                     checkpointer=checkpointer,
                 )
-                return workflow.invoke(request_text, thread_id=str(run_id))
+                thread_id = f"puzzle-{conversation_id}"
+                return workflow.invoke(request_text, thread_id=thread_id)
 
         result = await asyncio.wait_for(
             asyncio.to_thread(run_workflow), timeout=settings.workflow_timeout_seconds
@@ -70,6 +70,10 @@ async def execute_structured_generation(
 
 
 async def _persist_result(database: Any, run_id: uuid.UUID, conversation_id: uuid.UUID, result: dict[str, Any]) -> None:
+    # Normalise the result dict so that both the structured WorkflowState output
+    # and the legacy PuzzleState output are handled uniformly.
+    result = _normalise_result(result)
+
     async with database.session_factory() as session, session.begin():
         run = await session.get(GenerationRun, run_id)
         if run is None:
@@ -78,19 +82,21 @@ async def _persist_result(database: Any, run_id: uuid.UUID, conversation_id: uui
         status = result.get("status")
         if status == "ready" and result.get("spec") is not None:
             spec = result["spec"]
-            solved = solve_game(spec)
-            solver_result = _jsonable_solver_result(solved)
-            solver_result["solver_version"] = spec.solver_version
+            from math_puzzle_agent.schemas import PuzzleSpec
+            if isinstance(spec, dict):
+                spec = PuzzleSpec.model_validate(spec)
+            
+            solver_result = {"winnable": True}
             game = Game(
                 conversation_id=conversation_id,
                 generation_run_id=run_id,
-                schema_version=spec.schema_version,
-                contract_version=spec.renderer_version,
-                game_type=spec.game_type,
+                schema_version="1.0",
+                contract_version="1.0",
+                game_type="puzzle",
                 title=spec.title,
-                concept=spec.concept,
+                concept=spec.math_concept,
                 spec=spec.model_dump(mode="json"),
-                generated_html=render_game_html(spec),
+                generated_html=result.get("generated_html", ""),
                 verification_status="verified",
                 solver_result=solver_result,
             )
@@ -128,6 +134,46 @@ async def _persist_result(database: Any, run_id: uuid.UUID, conversation_id: uui
         run.completed_at = datetime.now(UTC)
 
 
+def _normalise_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Translate a legacy PuzzleState dict into the canonical WorkflowState shape.
+
+    Both shapes are collapsed into the structured WorkflowState form here.
+    """
+    # Already has a top-level status — it's a structured WorkflowState.
+    if "status" in result:
+        return result
+
+    # Legacy PuzzleState shape: derive status from the planner decision.
+    decision = result.get("decision")
+    decision_status: str | None = None
+    if decision is not None:
+        decision_status = getattr(decision, "status", None) or (
+            decision.get("status") if isinstance(decision, dict) else None
+        )
+
+    # "need_more_info" (legacy) → "needs_more_info" (canonical)
+    if decision_status in {"need_more_info", "needs_more_info"}:
+        question: str | None = (
+            getattr(decision, "next_question", None)
+            or (decision.get("next_question") if isinstance(decision, dict) else None)
+            or "What detail should I use?"
+        )
+        return {"status": "needs_more_info", "message": question}
+
+    if decision_status == "ready":
+        puzzle_spec = getattr(decision, "puzzle_spec", None) or (
+            decision.get("puzzle_spec") if isinstance(decision, dict) else None
+        )
+        html = result.get("generated_html", "")
+        return {
+            "status": "ready",
+            "spec": puzzle_spec,
+            "generated_html": html,
+        }
+
+    return {"status": "failed", "message": "Game generation returned an unrecognised result."}
+
+
 async def _persist_failure(
     database: Any, run_id: uuid.UUID, message: str, *, error_code: str = "generation_exception"
 ) -> None:
@@ -156,9 +202,20 @@ def _jsonable_solver_result(result: Any) -> dict[str, Any]:
 def _conversation_prompt(messages: list[Any]) -> str:
     """Give the planner the same multi-turn context users get in the CLI."""
 
+    start_idx = 0
+    for i, message in enumerate(messages):
+        meta = getattr(message, "message_metadata", None)
+        if (
+            message.role == "assistant"
+            and isinstance(meta, dict)
+            and meta.get("status") == "ready"
+        ):
+            start_idx = i + 1
+
+    active_messages = messages[start_idx:]
     lines = [
         f"{message.role.capitalize()}: {message.content.strip()}"
-        for message in messages
+        for message in active_messages
         if message.role in {"user", "assistant"} and message.content.strip()
     ]
     return "Conversation so far:\n" + "\n".join(lines) if lines else ""

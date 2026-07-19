@@ -19,6 +19,7 @@ class APISettings(BaseSettings):
     planner_model: str = Field(default="gpt-4o-mini", validation_alias="PLANNER_MODEL")
     designer_model: str = Field(default="gpt-4o-mini", validation_alias="GENERATOR_MODEL")
     reviewer_model: str = Field(default="gpt-4o-mini", validation_alias="REVIEWER_MODEL")
+    reviewer_vision_model: str = Field(default="gpt-4o", validation_alias="REVIEWER_VISION_MODEL")
     max_generation_attempts: int = Field(default=3, ge=1, le=5)
     workflow_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
     cors_allowed_origins: str = Field(

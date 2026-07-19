@@ -10,25 +10,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from math_puzzle_agent.api.routes.conversations import GameRecordResponse
 from math_puzzle_agent.db.repositories import GameRepository, get_session
-from math_puzzle_agent.games.fixtures import CANONICAL_PROJECTILE_GAME
-from math_puzzle_agent.games.schemas import GameSpecV1
-from math_puzzle_agent.games.html_renderer import render_game_html
+from math_puzzle_agent.games.fixtures import CANONICAL_PUZZLE, DEMO_GAME_HTML
+from math_puzzle_agent.schemas import PuzzleSpec
 
 
 router = APIRouter(prefix="/games", tags=["games"])
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
-@router.get("/demo", response_model=GameSpecV1)
-async def get_demo_game() -> GameSpecV1:
+@router.get("/demo", response_model=PuzzleSpec)
+async def get_demo_game() -> PuzzleSpec:
     """Return a solver-verified fixture through the production game contract."""
 
-    return CANONICAL_PROJECTILE_GAME
+    return CANONICAL_PUZZLE
 
 
 @router.get("/demo/content", response_class=Response)
 async def get_demo_game_content() -> Response:
-    return Response(render_game_html(CANONICAL_PROJECTILE_GAME), media_type="text/html")
+    return Response(DEMO_GAME_HTML, media_type="text/html")
 
 
 @router.get("/{game_id}/content", response_class=Response)

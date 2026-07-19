@@ -11,8 +11,7 @@ from math_puzzle_agent.api.routes import conversations as conversation_routes
 from math_puzzle_agent.api.routes import games as game_routes
 from math_puzzle_agent.db.models import Conversation, Game, GenerationRun, Message
 from math_puzzle_agent.db.repositories import get_session
-from math_puzzle_agent.games.fixtures import CANONICAL_PROJECTILE_GAME
-from math_puzzle_agent.games.html_renderer import render_game_html
+from math_puzzle_agent.games.fixtures import CANONICAL_PUZZLE, DEMO_GAME_HTML
 
 
 NOW = datetime(2026, 7, 19, 8, 0, tzinfo=UTC)
@@ -65,19 +64,19 @@ def conversation(*, title: str | None = None, deleted: bool = False) -> Conversa
 
 
 def game_record(conversation_id: uuid.UUID) -> Game:
-    spec = CANONICAL_PROJECTILE_GAME
+    spec = CANONICAL_PUZZLE
     run_id = uuid.uuid4()
     return Game(
         id=uuid.uuid4(),
         conversation_id=conversation_id,
         generation_run_id=run_id,
-        schema_version=spec.schema_version,
-        contract_version=spec.renderer_version,
-        game_type=spec.game_type,
+        schema_version="1.0",
+        contract_version="1.0",
+        game_type="puzzle",
         title=spec.title,
-        concept=spec.concept,
+        concept=spec.math_concept,
         spec=spec.model_dump(mode="json"),
-        generated_html=render_game_html(spec),
+        generated_html=DEMO_GAME_HTML,
         verification_status="verified",
         solver_result={"winnable": True},
         created_at=NOW,
@@ -97,7 +96,9 @@ def message_record(conversation_id: uuid.UUID, *, role: str, content: str) -> Me
 
 
 def client_for(session: FakeSession, *, raise_server_exceptions: bool = True) -> TestClient:
-    app = create_app(database=FakeDatabase())
+    from math_puzzle_agent.api.settings import APISettings
+    settings = APISettings(openai_api_key=None)
+    app = create_app(settings=settings, database=FakeDatabase())
 
     async def override_session():
         yield session
@@ -231,7 +232,7 @@ def test_message_submission_returns_and_persists_ready_game(monkeypatch) -> None
         assert payload["status"] == "ready"
         assert payload["game_id"] == str(stored_game.id)
         assert payload["run_id"] == str(stored_game.generation_run_id)
-        assert payload["game"]["game_type"] == "projectile_target"
+        assert payload["game"]["title"] == "The 3–4–5 Triangle Challenge"
         assert payload["assistant_message"]["metadata"]["status"] == "ready"
 
         messages = client.get(f"/api/v1/conversations/{active.id}/messages").json()
@@ -281,3 +282,29 @@ def test_message_generation_error_rolls_back_transaction(monkeypatch) -> None:
 
     assert response.status_code == 500
     assert session.transactions[-1].rolled_back
+
+
+def test_conversation_prompt_excludes_completed_runs():
+    from math_puzzle_agent.services.structured_generation import _conversation_prompt
+    from math_puzzle_agent.db.models import Message
+
+    m1 = Message(role="user", content="hello", message_metadata={})
+    m2 = Message(role="assistant", content="how can I help?", message_metadata={})
+    m3 = Message(role="user", content="make a game", message_metadata={})
+    m4 = Message(role="assistant", content="game is ready", message_metadata={"status": "ready"})
+    m5 = Message(role="user", content="make another game", message_metadata={})
+
+    # If no ready message, all are included
+    prompt_all = _conversation_prompt([m1, m2, m3])
+    assert "User: hello" in prompt_all
+    assert "Assistant: how can I help?" in prompt_all
+    assert "User: make a game" in prompt_all
+
+    # If there is a ready message, only messages after it are included
+    prompt_after = _conversation_prompt([m1, m2, m3, m4, m5])
+    assert "User: hello" not in prompt_after
+    assert "Assistant: how can I help?" not in prompt_after
+    assert "User: make a game" not in prompt_after
+    assert "Assistant: game is ready" not in prompt_after
+    assert "User: make another game" in prompt_after
+    assert "Conversation so far:\nUser: make another game" in prompt_after

@@ -41,3 +41,10 @@ def test_ready_when_database_is_unavailable() -> None:
         response = client.get("/api/v1/ready")
     assert response.status_code == 503
     assert response.json() == {"status": "not_ready", "database": "unavailable"}
+
+
+def test_api_settings_defaults() -> None:
+    from math_puzzle_agent.api.settings import APISettings
+    settings = APISettings(openai_api_key=None)
+    assert settings.reviewer_vision_model == "gpt-4o"
+

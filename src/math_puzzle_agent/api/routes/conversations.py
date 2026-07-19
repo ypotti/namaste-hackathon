@@ -17,7 +17,7 @@ from math_puzzle_agent.db.repositories import (
     MessageRepository,
     get_session,
 )
-from math_puzzle_agent.games.schemas import GameSpecV1, parse_game_spec_v1
+from math_puzzle_agent.schemas import PuzzleSpec
 from math_puzzle_agent.services.conversations import ConversationGenerationService
 from math_puzzle_agent.services.generation_runs import launch_run
 from math_puzzle_agent.services.structured_generation import execute_structured_generation
@@ -68,7 +68,7 @@ class GameRecordResponse(BaseModel):
     concept: str
     verification_status: str
     solver_result: dict[str, Any]
-    spec: GameSpecV1
+    spec: PuzzleSpec
     created_at: datetime
     updated_at: datetime
 
@@ -77,7 +77,7 @@ class ReadyMessageResponse(BaseModel):
     status: Literal["ready"] = "ready"
     run_id: uuid.UUID
     game_id: uuid.UUID
-    game: GameSpecV1
+    game: PuzzleSpec
     assistant_message: MessageResponse
 
 
@@ -174,7 +174,7 @@ async def create_message(
     return ReadyMessageResponse(
         run_id=game.generation_run_id,
         game_id=game.id,
-        game=parse_game_spec_v1(game.spec),
+        game=PuzzleSpec.model_validate(game.spec),
         assistant_message=MessageResponse.model_validate(assistant),
     )
 

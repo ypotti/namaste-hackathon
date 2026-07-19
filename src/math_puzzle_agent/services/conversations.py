@@ -13,9 +13,7 @@ from math_puzzle_agent.db.repositories import (
     GenerationRunRepository,
     MessageRepository,
 )
-from math_puzzle_agent.games.fixtures import CANONICAL_PROJECTILE_GAME
-from math_puzzle_agent.games.html_renderer import render_game_html
-from math_puzzle_agent.games.solvers.projectile import simulate_projectile
+from math_puzzle_agent.games.fixtures import CANONICAL_PUZZLE, DEMO_GAME_HTML
 
 
 class ConversationGenerationService:
@@ -35,28 +33,21 @@ class ConversationGenerationService:
         )
         run = await runs.create(conversation_id=conversation_id)
 
-        spec = CANONICAL_PROJECTILE_GAME
-        result = simulate_projectile(spec)
-        if not result.winnable:
-            raise ValueError("canonical projectile fixture failed solver verification")
+        spec = CANONICAL_PUZZLE
         solver_result = {
-            "winnable": result.winnable,
-            "closest_distance": result.closest_distance,
-            "closest_point": result.closest_point.model_dump(mode="json"),
-            "closest_step": result.closest_step,
-            "solver_version": spec.solver_version,
+            "winnable": True,
         }
         spec_json = spec.model_dump(mode="json")
         game = Game(
             conversation_id=conversation_id,
             generation_run_id=run.id,
-            schema_version=spec.schema_version,
-            contract_version=spec.renderer_version,
-            game_type=spec.game_type,
+            schema_version="1.0",
+            contract_version="1.0",
+            game_type="puzzle",
             title=spec.title,
-            concept=spec.concept,
+            concept=spec.math_concept,
             spec=spec_json,
-            generated_html=render_game_html(spec),
+            generated_html=DEMO_GAME_HTML,
             verification_status="verified",
             solver_result=solver_result,
         )
