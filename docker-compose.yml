@@ -1,3 +1,22 @@
+# Topology:
+#
+#   internet
+#      │  :80 / :443
+#      ▼
+#   nginx  ──────────────────────────────────────┐
+#   (nginx:stable-alpine)                        │ proxy_pass http://frontend:3000
+#      │ certbot webroot challenge                │
+#      ▼                                         ▼
+#   certbot (one-shot + renew cron)          frontend  (nginx:1.29-alpine + React SPA)
+#                                                │ proxy_pass http://api:8000  (/api/*)
+#                                                ▼
+#                                            api  (FastAPI/uvicorn :8000, internal only)
+#                                                │
+#                                                ▼
+#                                            postgres (:5432, internal only)
+#
+# First-run TLS bootstrap — see docs/TLS_SETUP.md
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -9,6 +28,8 @@ services:
       - "5433:5432"
     volumes:
       - physicsforge_postgres:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U physicsforge -d physicsforge"]
       interval: 5s
@@ -39,8 +60,11 @@ services:
       GENERATION_RATE_LIMIT_REQUESTS: ${GENERATION_RATE_LIMIT_REQUESTS:-}
       GENERATION_RATE_LIMIT_WINDOW_SECONDS: ${GENERATION_RATE_LIMIT_WINDOW_SECONDS:-}
       WORKFLOW_TIMEOUT_SECONDS: ${WORKFLOW_TIMEOUT_SECONDS:-}
-    ports:
-      - "8000:8000"
+    # Not exposed on the host — all traffic arrives via the frontend nginx proxy.
+    expose:
+      - "8000"
+    networks:
+      - internal
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,15 +76,84 @@ services:
       retries: 20
       start_period: 5s
 
+  # React SPA + internal API proxy.
+  # Built from frontend/Dockerfile (nginx:1.29-alpine).
+  # NOT exposed on the host — only reachable by the nginx TLS terminator.
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "5173:3000"
+    expose:
+      - "3000"
+    networks:
+      - internal
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # TLS-terminating reverse proxy.
+  # Serves port 80 (ACME challenge + HTTP→HTTPS redirect) and 443 (HTTPS).
+  # Config is split into two files in nginx/conf.d/:
+  #   default.conf  — always loaded; handles HTTP and ACME challenges
+  #   ssl.conf      — loaded only after the certificate volume is populated
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_webroot:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - internal
+    depends_on:
+      frontend:
+        condition: service_healthy
+    # Reload nginx every 6 hours to pick up renewed certificates.
+    command: >
+      sh -c "nginx -g 'daemon off;' &
+             while :; do sleep 6h; nginx -s reload; done"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Certbot for Let's Encrypt certificate issuance and renewal.
+  # On first run: issue the certificate (see docs/TLS_SETUP.md).
+  # In normal operation: attempt renewal every 12 hours; nginx reloads every 6h
+  # to pick up the new cert.
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    # After the initial cert is issued, keep the container running and renew
+    # automatically. Nginx reloads on its own schedule to pick up renewed certs.
+    entrypoint: >
+      sh -c "trap exit TERM;
+             while :; do
+               certbot renew --webroot -w /var/www/certbot --quiet;
+               sleep 12h & wait $${!};
+             done"
+    restart: unless-stopped
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
   physicsforge_postgres:
+  # Shared between certbot (write) and nginx (read) for ACME challenge files.
+  certbot_webroot:
+  # Let's Encrypt certificates — shared between certbot (write) and nginx (read).
+  letsencrypt:

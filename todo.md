@@ -1,0 +1,2 @@
+- Highlight current state in UI
+- 
