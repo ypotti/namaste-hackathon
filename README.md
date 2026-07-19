@@ -1,9 +1,9 @@
 # LangChain Math Puzzle Agent
 
-> The repository now also contains the first PhysicsForge web vertical slice:
-> a FastAPI/PostgreSQL backend and a trusted React/SVG projectile renderer. The
-> existing CLI remains available while the structured GameSpec workflow is
-> migrated incrementally.
+> PhysicsForge is the working product behind the **Gamified Learning** pitch:
+> educators turn a natural-language lesson idea into a solver-verified Puzzle
+> or Sandbox experience without writing code. FastAPI/PostgreSQL powers the
+> workflow and trusted React/SVG renderers support six game mechanics.
 
 ## Web application quick start
 
@@ -62,6 +62,8 @@ images. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for release guidance.
 
 The complete migration roadmap is in
 [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
+The pitch claims and shipped capabilities are mapped in
+[`docs/PITCH_ALIGNMENT.md`](docs/PITCH_ALIGNMENT.md).
 
 The legacy CLI's screenshot reviewer is optional in the web runtime. Install
 it with `python3.11 -m pip install -e '.[legacy-visual-review]'` and then run

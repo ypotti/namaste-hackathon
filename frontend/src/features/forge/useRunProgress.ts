@@ -5,10 +5,10 @@ import { initialProgress, parseProgressEvent, progressReducer, RUN_STAGES } from
 
 type Options = { onReady: (game: GameSpecV1) => void; onFailed: (message: string) => void; onNeedsMoreInfo: (message: string) => void };
 
-export function useRunProgress(runId: string | undefined, { onReady, onFailed }: Options) {
+export function useRunProgress(runId: string | undefined, { onReady, onFailed, onNeedsMoreInfo }: Options) {
   const [state, dispatch] = useReducer(progressReducer, initialProgress);
-  const callbacks = useRef({ onReady, onFailed });
-  callbacks.current = { onReady, onFailed };
+  const callbacks = useRef({ onReady, onFailed, onNeedsMoreInfo });
+  callbacks.current = { onReady, onFailed, onNeedsMoreInfo };
   useEffect(() => {
     if (!runId) { dispatch({ type: "reset" }); return; }
     let active = true;

@@ -13,6 +13,8 @@ test("forge renders a stable, playable game shell", async ({ page }, testInfo) =
   await page.goto("/");
   await expect(page.getByRole("heading", { name: projectileFixture.title })).toBeVisible();
   await expect(page.getByText("Solver verified")).toBeVisible();
+  await expect(page.getByRole("slider", { name: projectileFixture.controls.angle.label })).toBeVisible();
+  await expect(page.getByRole("slider", { name: projectileFixture.controls.thrust.label })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check answer" })).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath("forge.png"), fullPage: true });
   const box = await page.locator(".game").boundingBox();
