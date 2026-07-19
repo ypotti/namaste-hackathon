@@ -201,6 +201,9 @@ def test_message_submission_returns_and_persists_ready_game(monkeypatch) -> None
         async def get(self, game_id):
             return stored_game if game_id == stored_game.id else None
 
+        async def list_all(self):
+            return [stored_game]
+
     class FakeGeneration:
         def __init__(self, ignored_session) -> None:
             pass

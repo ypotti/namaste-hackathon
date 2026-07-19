@@ -46,3 +46,10 @@ async def get_game(game_id: uuid.UUID, session: Session) -> GameRecordResponse:
     if game is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found")
     return GameRecordResponse.model_validate(game)
+
+
+@router.get("", response_model=list[GameRecordResponse])
+async def list_games(session: Session) -> list[GameRecordResponse]:
+    """List all games stored in the database."""
+    games = await GameRepository(session).list_all()
+    return [GameRecordResponse.model_validate(g) for g in games]

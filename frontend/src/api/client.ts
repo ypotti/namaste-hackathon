@@ -70,6 +70,10 @@ export function getGame(gameId: string, signal?: AbortSignal) {
   return request<GameRecord>(`/games/${encodeURIComponent(gameId)}`, { signal });
 }
 
+export function listGames(signal?: AbortSignal) {
+  return request<GameRecord[]>(`/games`, { signal });
+}
+
 export function gameContentUrl(gameId?: string) {
   return gameId ? `${API_ROOT}/games/${encodeURIComponent(gameId)}/content` : `${API_ROOT}/games/demo/content`;
 }

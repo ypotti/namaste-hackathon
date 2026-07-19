@@ -113,3 +113,10 @@ class GameRepository:
             .order_by(Game.created_at.desc(), Game.id.desc())
         )
         return list(result)
+
+    async def list_all(self) -> list[Game]:
+        result = await self.session.scalars(
+            select(Game)
+            .order_by(Game.created_at.desc(), Game.id.desc())
+        )
+        return list(result)
