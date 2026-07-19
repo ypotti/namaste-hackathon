@@ -1,0 +1,14 @@
+export type Point = { x: number; y: number };
+type Difficulty = "starter" | "intermediate" | "advanced";
+export type Learning = { principle: string; explanation: string; hint: string };
+type Base = { schema_version:"1.0"; title:string; concept:string; eyebrow:string; instructions:string; difficulty:Difficulty; learning:Learning };
+export type ProjectileGameSpec = Base & { game_type:"projectile_target"; renderer_version:"projectile-svg@1"; solver_version:"projectile@1";
+  scene:{theme:"lab"|"moon"|"stadium"|"orbit"|"cliff";player_object:"probe"|"ball";target_object:"energy_gate"|"hoop"|"capture_field"|"checkpoint"|"survey_ring";effect:"orange_trail"|"comet_trail"|"motion_dots"};
+  controls:{angle:{id:"angle";label:string;min:20;max:65;step:1;default:number;unit:"degrees"};thrust:{id:"thrust";label:string;min:55;max:100;step:1;default:number;unit:"percent"}};
+  physics:{gravity:number;target_x:number;target_y:number;launch_point:Point;thrust_scale:3.32;target_tolerance:42;timestep_seconds:0.025;max_steps:320}; solution:{angle:number;power:number} };
+export type FallingObjectGameSpec = Base & { game_type:"falling_object";renderer_version:"falling-svg@1";solver_version:"falling@1";scene:"lab"|"tower"|"moon";physics:{gravity:number;target_time:number;time_tolerance:number};solution_height:number };
+export type BalanceTorqueGameSpec = Base & { game_type:"balance_torque";renderer_version:"balance-svg@1";solver_version:"balance@1";scene:"workshop"|"playground"|"lab";physics:{left_weight:number;left_distance:number;right_weight:number;torque_tolerance:number};solution_right_distance:number };
+export type MomentumCollisionGameSpec = Base & { game_type:"momentum_collision";renderer_version:"collision-svg@1";solver_version:"momentum@1";scene:"track"|"space"|"lab";physics:{player_mass:number;other_mass:number;other_velocity:number;target_velocity:number;velocity_tolerance:number};solution_player_velocity:number };
+export type FractionGroupingGameSpec = Base & { game_type:"fraction_grouping";renderer_version:"fraction-svg@1";solver_version:"fraction@1";scene:"garden"|"bakery"|"classroom";total_items:number;numerator:number;denominator:number;solution_selected_count:number };
+export type GraphMatchGameSpec = Base & { game_type:"graph_match";renderer_version:"graph-svg@1";solver_version:"linear-graph@1";scene:"coordinate_grid"|"motion_graph"|"lab_chart";target_slope:number;target_intercept:number;solution_slope:number;solution_intercept:number;tolerance:number };
+export type GameSpecV1 = ProjectileGameSpec|FallingObjectGameSpec|BalanceTorqueGameSpec|MomentumCollisionGameSpec|FractionGroupingGameSpec|GraphMatchGameSpec;

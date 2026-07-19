@@ -1,5 +1,72 @@
 # LangChain Math Puzzle Agent
 
+> The repository now also contains the first PhysicsForge web vertical slice:
+> a FastAPI/PostgreSQL backend and a trusted React/SVG projectile renderer. The
+> existing CLI remains available while the structured GameSpec workflow is
+> migrated incrementally.
+
+## Web application quick start
+
+Requirements: Python 3.11+, Node.js, npm, and Docker.
+
+To run PostgreSQL, the API, and the frontend together with Docker:
+
+```bash
+cp .env.example .env # optional; add OPENAI_API_KEY for model-backed generation
+docker compose up --build
+```
+
+Open `http://localhost:5173`. The API is also available directly at
+`http://localhost:8000`; database migrations run automatically at startup.
+
+To stop the stack, press Ctrl-C and run `docker compose down`. Add `-v` only
+when you also want to delete the PostgreSQL data volume.
+
+For local development without containerizing the API and frontend:
+
+```bash
+cp .env.example .env
+docker compose up -d postgres
+python3.11 -m pip install -e '.[dev]'
+alembic upgrade head
+physicsforge-api
+```
+
+In a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. Vite proxies `/api` to FastAPI on port 8000.
+The current vertical slice loads the solver-verified demo contract from
+`GET /api/v1/games/demo` and falls back to the same bundled fixture when the
+API is unavailable.
+
+Verification:
+
+```bash
+python3.11 -m pytest
+cd frontend
+npm run typecheck
+npm test
+npm run build
+npm run test:visual # first install Chromium: npx playwright install chromium
+```
+
+CI runs migrations and Python tests against PostgreSQL, checks and builds React,
+runs deterministic desktop/mobile browser tests, and builds both production
+images. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for release guidance.
+
+The complete migration roadmap is in
+[`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
+
+The legacy CLI's screenshot reviewer is optional in the web runtime. Install
+it with `python3.11 -m pip install -e '.[legacy-visual-review]'` and then run
+`playwright install chromium` when using the original HTML workflow.
+
 This is a production-style, multi-turn LangGraph application for generating a single interactive p5.js math-puzzle page from a chat.
 
 The user chats with a single agent interface. Internally, the agent orchestrates a multi-agent LangGraph workflow featuring a Planner, Generator, and Reviewer loop.

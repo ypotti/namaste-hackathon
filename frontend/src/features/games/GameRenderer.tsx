@@ -1,0 +1,3 @@
+import type {GameSpecV1} from "../../types/game";
+import {BalanceRenderer,FallingRenderer,FractionRenderer,GraphRenderer,MomentumRenderer,ProjectileRenderer} from "./MechanicRenderers";
+export function GameRenderer({spec}:{spec:GameSpecV1}){switch(spec.game_type){case"projectile_target":return <ProjectileRenderer spec={spec}/>;case"falling_object":return <FallingRenderer spec={spec}/>;case"balance_torque":return <BalanceRenderer spec={spec}/>;case"momentum_collision":return <MomentumRenderer spec={spec}/>;case"fraction_grouping":return <FractionRenderer spec={spec}/>;case"graph_match":return <GraphRenderer spec={spec}/>;default:{const neverSpec:never=spec;throw new Error(`Unsupported game type: ${String(neverSpec)}`)}}}

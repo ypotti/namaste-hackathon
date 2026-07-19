@@ -1,0 +1,60 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_DB: physicsforge, POSTGRES_USER: physicsforge, POSTGRES_PASSWORD: physicsforge }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U physicsforge -d physicsforge"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://physicsforge:physicsforge@127.0.0.1:5432/physicsforge
+      OPENAI_API_KEY: test-key
+      SCREENSHOT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip }
+      - run: python -m pip install -e '.[dev]'
+      - run: alembic upgrade head
+      - run: pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - working-directory: frontend
+        run: npm ci
+      - working-directory: frontend
+        run: npm run typecheck
+      - working-directory: frontend
+        run: npm test
+      - working-directory: frontend
+        run: npm run build
+      - working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - working-directory: frontend
+        run: npm run test:visual
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results/visual
+          if-no-files-found: ignore
+          retention-days: 14
+
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t physicsforge-api .
+      - run: docker build -t physicsforge-web frontend
