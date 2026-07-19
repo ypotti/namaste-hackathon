@@ -161,7 +161,24 @@ class WorkflowConfig:
     )
 
     # ─────────────────────────────────────────────────────────────────
-    # 11. SESSION RUN ID
+    # 11. INPUT GUARDRAIL
+    #     guardrail_enabled: when True, the input guardrail will filter
+    #     out prompts that are off-topic, harmful, jailbreaks, or prompt stealing.
+    #     guardrail_threshold: similarity threshold for blocking.
+    #     guardrail_embedding_model: embedding model to use.
+    # ─────────────────────────────────────────────────────────────────
+    guardrail_enabled: bool = field(
+        default_factory=lambda: os.getenv("GUARDRAIL_ENABLED", "true").lower() == "true"
+    )
+    guardrail_threshold: float = field(
+        default_factory=lambda: float(os.getenv("GUARDRAIL_THRESHOLD", "0.35"))
+    )
+    guardrail_embedding_model: str = field(
+        default_factory=lambda: os.getenv("GUARDRAIL_EMBEDDING_MODEL", "text-embedding-3-small")
+    )
+
+    # ─────────────────────────────────────────────────────────────────
+    # 12. SESSION RUN ID
     #     A 4-digit random number generated once per process startup.
     #     Combined with the thread_id it makes every screenshot filename
     #     unique across runs even when the thread_id is reused.
@@ -199,6 +216,9 @@ class WorkflowConfig:
             f"  reviewer_vision_model: {self.reviewer_vision_model}\n"
             f"  screenshot_dir      : {self.screenshot_dir}\n"
             f"  screenshot_save     : {self.screenshot_save}\n"
+            f"  guardrail_enabled   : {self.guardrail_enabled}\n"
+            f"  guardrail_threshold : {self.guardrail_threshold}\n"
+            f"  guardrail_embedding_model: {self.guardrail_embedding_model}\n"
             f"  session_run_id      : {self.session_run_id}\n"
             f")"
         )
