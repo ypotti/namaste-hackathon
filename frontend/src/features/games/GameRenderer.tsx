@@ -1,0 +1,4 @@
+import type {GameSpecUnion} from "../../types/game";
+import {GameModeProvider,type GameMode} from "./GameChrome";
+import {BalanceRenderer,FallingRenderer,FractionRenderer,GraphRenderer,MomentumRenderer,ProjectileRenderer} from "./MechanicRenderers";
+export function GameRenderer({spec,mode="puzzle"}:{spec:GameSpecUnion;mode?:GameMode}){let renderer;switch(spec.game_type){case"projectile_target":renderer=<ProjectileRenderer spec={spec}/>;break;case"falling_object":renderer=<FallingRenderer spec={spec}/>;break;case"balance_torque":renderer=<BalanceRenderer spec={spec}/>;break;case"momentum_collision":renderer=<MomentumRenderer spec={spec}/>;break;case"fraction_grouping":renderer=<FractionRenderer spec={spec}/>;break;case"graph_match":renderer=<GraphRenderer spec={spec}/>;break;default:{const neverSpec:never=spec;throw new Error(`Unsupported game type: ${String(neverSpec)}`)}}return <GameModeProvider mode={mode}>{renderer}</GameModeProvider>}

@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: physicsforge
+      POSTGRES_USER: physicsforge
+      POSTGRES_PASSWORD: physicsforge
+    ports:
+      - "5433:5432"
+    volumes:
+      - physicsforge_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U physicsforge -d physicsforge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://physicsforge:physicsforge@postgres:5432/physicsforge
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PLANNER_MODEL: ${PLANNER_MODEL:-gpt-4o-mini}
+      GENERATOR_MODEL: ${GENERATOR_MODEL:-gpt-4o-mini}
+      REVIEWER_MODEL: ${REVIEWER_MODEL:-gpt-4o-mini}
+      REVIEWER_VISION_MODEL: ${REVIEWER_VISION_MODEL:-}
+      SCREENSHOT_ENABLED: ${SCREENSHOT_ENABLED:-false}
+      SCREENSHOT_SAVE: ${SCREENSHOT_SAVE:-true}
+      GUARDRAIL_ENABLED: ${GUARDRAIL_ENABLED:-true}
+      GUARDRAIL_THRESHOLD: ${GUARDRAIL_THRESHOLD:-0.35}
+      GUARDRAIL_EMBEDDING_MODEL: ${GUARDRAIL_EMBEDDING_MODEL:-}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-}
+      GENERATION_RATE_LIMIT_REQUESTS: ${GENERATION_RATE_LIMIT_REQUESTS:-}
+      GENERATION_RATE_LIMIT_WINDOW_SECONDS: ${GENERATION_RATE_LIMIT_WINDOW_SECONDS:-}
+      WORKFLOW_TIMEOUT_SECONDS: ${WORKFLOW_TIMEOUT_SECONDS:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "alembic upgrade head && uvicorn math_puzzle_agent.api.app:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  physicsforge_postgres:

@@ -1,21 +1,32 @@
 [project]
 name = "langchain-math-puzzle-agent"
 version = "0.1.0"
-description = "A LangGraph workflow that turns math-puzzle chats into interactive p5.js pages."
+description = "A React and FastAPI platform that turns math-puzzle chats into structured interactive games."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.14.0",
+    "asyncpg>=0.30.0",
+    "fastapi>=0.115.0",
     "langchain>=1.0.0",
     "langchain-openai>=1.0.0",
     "langgraph>=1.0.0",
+    "langgraph-checkpoint-postgres>=2.0.0",
     "langgraph-checkpoint-sqlite>=2.0.0",
-    "playwright>=1.49.0",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.7.0",
+    "psycopg[binary]>=3.2.0",
     "python-dotenv>=1.0.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "uvicorn[standard]>=0.34.0",
 ]
+
+[project.optional-dependencies]
+legacy-visual-review = ["playwright>=1.49.0"]
 
 [project.scripts]
 math-puzzle-agent = "math_puzzle_agent.cli:main"
+physicsforge-api = "math_puzzle_agent.api.app:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -25,7 +36,7 @@ build-backend = "hatchling.build"
 packages = ["src/math_puzzle_agent"]
 
 [dependency-groups]
-dev = ["pytest>=8.0.0"]
+dev = ["httpx>=0.28.0", "pytest>=8.0.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -66,15 +66,24 @@ def route_after_review(state: PuzzleState, max_attempts: int = 3) -> Literal["ge
     return "generator"
 
 
-def build_graph(cfg: WorkflowConfig, checkpointer=None):
+def build_graph(
+    cfg: WorkflowConfig,
+    checkpointer=None,
+    *,
+    planner_llm=None,
+    reviewer_llm=None,
+    generator_llm=None,
+    vision_llm=None,
+):
     """Build the workflow. Pass a LangGraph checkpointer for multi-turn memory."""
-    planner_llm = get_llm(cfg.planner_model, cfg.planner_temperature)
-    reviewer_llm = get_llm(cfg.reviewer_model, cfg.reviewer_temperature)
-    generator_llm = get_llm(cfg.generator_model, cfg.generator_temperature)
-    # Vision LLM: plain (no structured output) — used for the screenshot pre-pass.
-    # Must be a model that accepts image_url content blocks (e.g. gpt-4o, gpt-4.1).
-    # Uses reviewer_temperature so it honours the same config knob.
-    vision_llm = get_llm(cfg.reviewer_vision_model, cfg.reviewer_temperature)
+    if planner_llm is None:
+        planner_llm = get_llm(cfg.planner_model, cfg.planner_temperature)
+    if reviewer_llm is None:
+        reviewer_llm = get_llm(cfg.reviewer_model, cfg.reviewer_temperature)
+    if generator_llm is None:
+        generator_llm = get_llm(cfg.generator_model, cfg.generator_temperature)
+    if vision_llm is None:
+        vision_llm = get_llm(cfg.reviewer_vision_model, cfg.reviewer_temperature)
 
     output_dir = cfg.output_dir
 
