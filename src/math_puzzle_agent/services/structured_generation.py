@@ -12,6 +12,7 @@ from math_puzzle_agent.db.models import Game, GenerationRun
 from math_puzzle_agent.db.checkpoints import postgres_checkpointer_sync
 from math_puzzle_agent.db.repositories import MessageRepository
 from math_puzzle_agent.games.registry import solve_game
+from math_puzzle_agent.games.html_renderer import render_game_html
 from math_puzzle_agent.structured_workflow import create_openai_structured_workflow
 
 
@@ -89,6 +90,7 @@ async def _persist_result(database: Any, run_id: uuid.UUID, conversation_id: uui
                 title=spec.title,
                 concept=spec.concept,
                 spec=spec.model_dump(mode="json"),
+                generated_html=render_game_html(spec),
                 verification_status="verified",
                 solver_result=solver_result,
             )

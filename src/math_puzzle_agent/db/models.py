@@ -84,6 +84,7 @@ class Game(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     concept: Mapped[str] = mapped_column(Text, nullable=False)
     spec: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    generated_html: Mapped[str] = mapped_column(Text, nullable=False)
     verification_status: Mapped[str] = mapped_column(Text, nullable=False)
     solver_result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

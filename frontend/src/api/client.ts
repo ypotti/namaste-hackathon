@@ -16,7 +16,7 @@ export type Conversation = {
 
 type AssistantMessage = { id: string; content: string };
 export type MessageResponse =
-  | { status: "ready"; game: GameSpecV1; assistant_message?: AssistantMessage; run_id?: string }
+  | { status: "ready"; game_id: string; game: GameSpecV1; assistant_message?: AssistantMessage; run_id?: string }
   | { status: "needs_more_info"; assistant_message: AssistantMessage; run_id?: string }
   | { status: "processing"; run_id: string; assistant_message?: AssistantMessage };
 
@@ -68,6 +68,10 @@ export function getRun(runId: string, signal?: AbortSignal) {
 
 export function getGame(gameId: string, signal?: AbortSignal) {
   return request<GameRecord>(`/games/${encodeURIComponent(gameId)}`, { signal });
+}
+
+export function gameContentUrl(gameId?: string) {
+  return gameId ? `${API_ROOT}/games/${encodeURIComponent(gameId)}/content` : `${API_ROOT}/games/demo/content`;
 }
 
 export function runEventsUrl(runId: string) {

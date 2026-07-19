@@ -14,6 +14,7 @@ from math_puzzle_agent.db.repositories import (
     MessageRepository,
 )
 from math_puzzle_agent.games.fixtures import CANONICAL_PROJECTILE_GAME
+from math_puzzle_agent.games.html_renderer import render_game_html
 from math_puzzle_agent.games.solvers.projectile import simulate_projectile
 
 
@@ -55,6 +56,7 @@ class ConversationGenerationService:
             title=spec.title,
             concept=spec.concept,
             spec=spec_json,
+            generated_html=render_game_html(spec),
             verification_status="verified",
             solver_result=solver_result,
         )

@@ -21,7 +21,7 @@ def test_child_foreign_keys_cascade_at_the_database_boundary() -> None:
 def test_required_json_contract_fields_are_non_nullable() -> None:
     game_columns = inspect(Game).columns
     assert not game_columns.spec.nullable
+    assert not game_columns.generated_html.nullable
     assert not game_columns.solver_result.nullable
     assert not game_columns.schema_version.nullable
     assert not game_columns.contract_version.nullable
-

@@ -12,6 +12,7 @@ from math_puzzle_agent.api.routes import games as game_routes
 from math_puzzle_agent.db.models import Conversation, Game, GenerationRun, Message
 from math_puzzle_agent.db.repositories import get_session
 from math_puzzle_agent.games.fixtures import CANONICAL_PROJECTILE_GAME
+from math_puzzle_agent.games.html_renderer import render_game_html
 
 
 NOW = datetime(2026, 7, 19, 8, 0, tzinfo=UTC)
@@ -76,6 +77,7 @@ def game_record(conversation_id: uuid.UUID) -> Game:
         title=spec.title,
         concept=spec.concept,
         spec=spec.model_dump(mode="json"),
+        generated_html=render_game_html(spec),
         verification_status="verified",
         solver_result={"winnable": True},
         created_at=NOW,
@@ -242,6 +244,10 @@ def test_message_submission_returns_and_persists_ready_game(monkeypatch) -> None
         fetched_game = client.get(f"/api/v1/games/{stored_game.id}")
         assert fetched_game.status_code == 200
         assert fetched_game.json()["spec"]["title"] == stored_game.spec["title"]
+        game_content = client.get(f"/api/v1/games/{stored_game.id}/content")
+        assert game_content.status_code == 200
+        assert game_content.text == stored_game.generated_html
+        assert game_content.headers["x-frame-options"] == "SAMEORIGIN"
         assert client.get(f"/api/v1/games/{uuid.uuid4()}").status_code == 404
 
     assert session.transactions[-1].committed

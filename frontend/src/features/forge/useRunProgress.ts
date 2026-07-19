@@ -1,9 +1,8 @@
 import { useEffect, useReducer, useRef } from "react";
-import { getGame, getRun, runEventsUrl } from "../../api/client";
-import type { GameSpecV1 } from "../../types/game";
+import { getGame, getRun, runEventsUrl,type GameRecord } from "../../api/client";
 import { initialProgress, parseProgressEvent, progressReducer, RUN_STAGES } from "./progress";
 
-type Options = { onReady: (game: GameSpecV1) => void; onFailed: (message: string) => void; onNeedsMoreInfo: (message: string) => void };
+type Options = { onReady: (game: GameRecord) => void; onFailed: (message: string) => void; onNeedsMoreInfo: (message: string) => void };
 
 export function useRunProgress(runId: string | undefined, { onReady, onFailed, onNeedsMoreInfo }: Options) {
   const [state, dispatch] = useReducer(progressReducer, initialProgress);
@@ -16,7 +15,7 @@ export function useRunProgress(runId: string | undefined, { onReady, onFailed, o
     const source = new EventSource(runEventsUrl(runId));
     dispatch({ type: "connect" });
     const finish = async (gameId: string) => {
-      try { const record = await getGame(gameId, controller.signal); if (active) callbacks.current.onReady(record.spec); }
+      try { const record = await getGame(gameId, controller.signal); if (active) callbacks.current.onReady(record); }
       catch (error) { if (active) dispatch({ type: "failed", message: error instanceof Error ? error.message : "The finished game could not be loaded." }); }
     };
     const consume = (event: Event, eventType?: string) => {
